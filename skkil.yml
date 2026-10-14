@@ -21,6 +21,12 @@ requires:
     check: command -v docker
     hint: install Docker for the Postgres-backed tests
 
+dev:
+  run:
+    - name: postgres
+      run: docker compose up
+      dir: modules/service
+
 ci:
   tasks:
     - name: protocol
