@@ -33,3 +33,8 @@ ci:
       dir: modules/protocol
       lint: buf lint
       build: buf build -o /dev/null
+    - name: adapter-jvm
+      dir: modules/adapter-jvm
+      format: ./gradlew spotlessCheck
+      test: ./gradlew test
+      build: ./gradlew build -x test

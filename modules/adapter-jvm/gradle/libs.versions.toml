@@ -1,0 +1,20 @@
+[versions]
+kotlin = "2.3.21"
+spring-boot = "4.1.2"
+protobuf = "4.36.2"
+protobuf-plugin = "0.10.1"
+nimbus-jose-jwt = "10.10"
+spotless = "8.11.0"
+ktlint = "1.8.0"
+
+[libraries]
+spring-boot-bom = { module = "org.springframework.boot:spring-boot-dependencies", version.ref = "spring-boot" }
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+protobuf-java-util = { module = "com.google.protobuf:protobuf-java-util", version.ref = "protobuf" }
+protoc = { module = "com.google.protobuf:protoc", version.ref = "protobuf" }
+nimbus-jose-jwt = { module = "com.nimbusds:nimbus-jose-jwt", version.ref = "nimbus-jose-jwt" }
+
+[plugins]
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+protobuf = { id = "com.google.protobuf", version.ref = "protobuf-plugin" }
+spotless = { id = "com.diffplug.spotless", version.ref = "spotless" }
