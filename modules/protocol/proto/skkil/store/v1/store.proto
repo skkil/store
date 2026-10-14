@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package skkil.store.v1;
+
+option go_package = "github.com/skkil/store/modules/service/gen/storev1;storev1";
+option java_multiple_files = true;
+option java_package = "org.skkil.store.v1";
+
+// Push goes to the product server, which runs each named mutation inside the
+// write path (store_begin … store_end). Pull and Pokes go to the store service,
+// which only reads the committed log.
+service StoreService {
+  rpc Pull(PullRequest) returns (PullResponse);
+  rpc Pokes(PokesRequest) returns (stream Poke);
+}
+
+// Implemented by each product server, not by the store service.
+service PushService {
+  rpc Push(PushRequest) returns (PushResponse);
+}
+
+message Mutation {
+  // Per client, starts at 1 and increases by one. The server applies each
+  // (client_id, mutation_id) at most once.
+  uint64 mutation_id = 1;
+  // A product-defined name such as "task.create".
+  string name = 2;
+  // UTF-8 JSON object with the mutation's arguments.
+  bytes args = 3;
+  // Hybrid logical clock of the client when the mutation was made.
+  int64 hlc = 4;
+  // W3C traceparent, only when the user opted into tracing.
+  string traceparent = 5;
+}
+
+message PushRequest {
+  uint32 protocol_version = 1;
+  string client_id = 2;
+  repeated Mutation mutations = 3;
+  // The product's schema version the client was built against.
+  uint32 schema_version = 4;
+}
+
+message MutationResult {
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_APPLIED = 1;
+    STATUS_DUPLICATE = 2;
+    STATUS_REJECTED = 3;
+  }
+  uint64 mutation_id = 1;
+  Status status = 2;
+  // Why a mutation was rejected, readable by the user.
+  string reason = 3;
+  // The scope version that recorded the result.
+  uint64 version = 4;
+}
+
+// Push always answers 2xx; a rejection is a result, never a transport error.
+message PushResponse {
+  repeated MutationResult results = 1;
+}
+
+message Cursor {
+  uint32 epoch = 1;
+  uint64 version = 2;
+  // Hash-chain value at `version`; empty at version 0.
+  bytes hash = 3;
+}
+
+message PullRequest {
+  uint32 protocol_version = 1;
+  string client_id = 2;
+  Cursor cursor = 3;
+  // Read-your-writes: the server must not answer from a state older than this.
+  uint64 min_version = 4;
+  // Most versions to return; the server may return fewer.
+  uint32 limit = 5;
+}
+
+message Change {
+  enum Op {
+    OP_UNSPECIFIED = 0;
+    OP_UPSERT = 1;
+    OP_DELETE = 2;
+  }
+  string table = 1;
+  string row_id = 2;
+  Op op = 3;
+  // UTF-8 JSON object with the full row after the change; empty for deletes.
+  bytes data = 4;
+}
+
+message Rejection {
+  uint64 mutation_id = 1;
+  string reason = 2;
+}
+
+// Everything one mutation (or one rejection) did, committed atomically.
+message Version {
+  uint64 version = 1;
+  string client_id = 2;
+  uint64 mutation_id = 3;
+  bytes hash = 4;
+  int64 committed_at = 5;
+  repeated Change changes = 6;
+  Rejection rejection = 7;
+}
+
+message Entries {
+  repeated Version versions = 1;
+  // True when versions beyond the last one returned already exist.
+  bool more = 2;
+}
+
+// The client's cursor no longer matches the log (restore, failover, or a
+// compacted prefix): drop synced state, pull from version 0 and re-send
+// pending mutations.
+message Reset {
+  uint32 epoch = 1;
+  string reason = 2;
+}
+
+message PullResponse {
+  oneof body {
+    Entries entries = 1;
+    Reset reset = 2;
+  }
+  // The highest mutation_id of this client the server has processed.
+  uint64 last_mutation_id = 3;
+  uint64 head_version = 4;
+  uint32 epoch = 5;
+}
+
+message PokesRequest {
+  uint32 protocol_version = 1;
+  string client_id = 2;
+}
+
+// A hint that the scope reached `version`; clients pull when it is ahead of
+// their cursor. Pokes may be lost, duplicated or reordered.
+message Poke {
+  uint64 version = 1;
+}

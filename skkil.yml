@@ -1,0 +1,29 @@
+version: 1
+name: store
+
+requires:
+  - name: Go
+    check: command -v go
+    hint: install Go 1.26 or later
+  - name: Rust
+    check: command -v cargo
+    hint: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+  - name: buf
+    check: command -v buf
+    hint: install buf (https://buf.build/docs/installation)
+  - name: Java 25
+    check: java -version 2>&1 | grep -q 'version "2[5-9]'
+    hint: install a JDK 25
+  - name: pnpm
+    check: command -v pnpm
+    hint: npm install -g pnpm
+  - name: Docker
+    check: command -v docker
+    hint: install Docker for the Postgres-backed tests
+
+ci:
+  tasks:
+    - name: protocol
+      dir: modules/protocol
+      lint: buf lint
+      build: buf build -o /dev/null
