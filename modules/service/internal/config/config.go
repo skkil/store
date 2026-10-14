@@ -18,6 +18,8 @@ type Config struct {
 	TokenJWKSURL      string
 	AllowedOrigins    []string
 	PollInterval      time.Duration
+	PokeKeepAlive     time.Duration
+	MinVersionWait    time.Duration
 	ShutdownTimeout   time.Duration
 	LogLevel          slog.Level
 }
@@ -25,6 +27,8 @@ type Config struct {
 const (
 	defaultListenAddr      = ":8080"
 	defaultPollInterval    = 5 * time.Second
+	defaultPokeKeepAlive   = 25 * time.Second
+	defaultMinVersionWait  = 2 * time.Second
 	defaultShutdownTimeout = 20 * time.Second
 )
 
@@ -54,6 +58,12 @@ func Load(getenv func(string) string) (Config, error) {
 	}
 	var err error
 	if cfg.PollInterval, err = duration(getenv, "STORE_POLL_INTERVAL", defaultPollInterval); err != nil {
+		errs = append(errs, err)
+	}
+	if cfg.PokeKeepAlive, err = duration(getenv, "STORE_POKE_KEEPALIVE", defaultPokeKeepAlive); err != nil {
+		errs = append(errs, err)
+	}
+	if cfg.MinVersionWait, err = duration(getenv, "STORE_MIN_VERSION_WAIT", defaultMinVersionWait); err != nil {
 		errs = append(errs, err)
 	}
 	if cfg.ShutdownTimeout, err = duration(getenv, "STORE_SHUTDOWN_TIMEOUT", defaultShutdownTimeout); err != nil {

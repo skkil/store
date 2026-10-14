@@ -24,6 +24,9 @@ func TestLoadAppliesDefaults(t *testing.T) {
 	if cfg.ListenAddr != ":8080" || cfg.PollInterval != 5*time.Second || cfg.ShutdownTimeout != 20*time.Second {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
+	if cfg.PokeKeepAlive != 25*time.Second || cfg.MinVersionWait != 2*time.Second {
+		t.Fatalf("unexpected defaults: %+v", cfg)
+	}
 	if cfg.LogLevel != slog.LevelInfo || cfg.AllowedOrigins != nil {
 		t.Fatalf("unexpected defaults: %+v", cfg)
 	}
@@ -38,12 +41,17 @@ func TestLoadReadsEveryVariable(t *testing.T) {
 		"STORE_ALLOWED_ORIGINS":  " https://a.example , ,https://b.example",
 		"STORE_POLL_INTERVAL":    "750ms",
 		"STORE_SHUTDOWN_TIMEOUT": "3s",
+		"STORE_POKE_KEEPALIVE":   "10s",
+		"STORE_MIN_VERSION_WAIT": "500ms",
 		"STORE_LOG_LEVEL":        "debug",
 	}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if cfg.ListenAddr != "127.0.0.1:9000" || cfg.TokenJWKSURL != "https://time.example/jwks.json" {
+		t.Fatalf("unexpected config: %+v", cfg)
+	}
+	if cfg.PokeKeepAlive != 10*time.Second || cfg.MinVersionWait != 500*time.Millisecond {
 		t.Fatalf("unexpected config: %+v", cfg)
 	}
 	if !slices.Equal(cfg.AllowedOrigins, []string{"https://a.example", "https://b.example"}) {
