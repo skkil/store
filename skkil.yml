@@ -33,6 +33,12 @@ ci:
       dir: modules/protocol
       lint: buf lint
       build: buf build -o /dev/null
+    - name: service
+      dir: modules/service
+      format: test -z "$(gofmt -l .)"
+      lint: go vet ./... && go tool staticcheck ./... && buf generate && git diff --exit-code -- gen
+      test: go test -race ./...
+      build: go build -o /dev/null ./cmd/store
     - name: adapter-jvm
       dir: modules/adapter-jvm
       format: ./gradlew spotlessCheck

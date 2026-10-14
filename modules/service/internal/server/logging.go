@@ -36,7 +36,7 @@ func (l loggingInterceptor) WrapStreamingHandler(next connect.StreamingHandlerFu
 }
 
 func (l loggingInterceptor) log(ctx context.Context, procedure, protocol string, start time.Time, err error) {
-	attrs := []any{"procedure", procedure, "protocol", protocol, "duration", time.Since(start)}
+	attrs := []any{"procedure", procedure, "protocol", protocol, "duration_ms", float64(time.Since(start).Microseconds()) / 1000}
 	if err != nil {
 		code := connect.CodeOf(err)
 		attrs = append(attrs, "code", code.String(), "error", err)

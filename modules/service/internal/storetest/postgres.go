@@ -20,7 +20,7 @@ import (
 )
 
 // Image is the Postgres image every test runs against.
-const Image = "postgres:17-alpine"
+const Image = "postgres:17.11-alpine"
 
 const templateName = "store_template"
 

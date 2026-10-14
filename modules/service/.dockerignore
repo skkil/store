@@ -1,0 +1,8 @@
+*
+!go.mod
+!go.sum
+!cmd/
+!internal/
+!gen/
+internal/storetest/
+**/*_test.go
