@@ -10,11 +10,11 @@ they land.
       hash chain, rejection, server writes, poke
 
 ## 2. Service (Go)
-- [ ] 2.1 Config, logging, health, metrics, graceful shutdown, Dockerfile
-- [ ] 2.2 Sync-token verification (ES256, PEM or JWKS)
-- [ ] 2.3 Pull by cursor with epoch/hash checks and Reset
-- [ ] 2.4 Pokes stream; LISTEN/NOTIFY bus with polling fallback
-- [ ] 2.5 Tests on real Postgres, two instances
+- [x] 2.1 Config, logging, health, metrics, graceful shutdown, Dockerfile
+- [x] 2.2 Sync-token verification (ES256, PEM or JWKS)
+- [x] 2.3 Pull by cursor with epoch/hash checks and Reset
+- [x] 2.4 Pokes stream; LISTEN/NOTIFY bus with polling fallback
+- [x] 2.5 Tests on real Postgres, two instances
 
 ## 3. Client core (Rust)
 - [ ] 3.1 Local schema: meta, pending, undo, issues; table registration
