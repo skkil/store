@@ -1,0 +1,18 @@
+[package]
+name = "skkil-store-testkit"
+description = "In-memory fake server and sample planner app for testing skkil store clients"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+name = "store_testkit"
+
+[dependencies]
+skkil-store-core = { workspace = true, features = ["bundled"] }
+sha2.workspace = true
+
+[lints]
+workspace = true

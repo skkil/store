@@ -1,0 +1,12 @@
+[package]
+name = "protogen"
+description = "Regenerates skkil-store-protocol from modules/protocol/proto"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[dependencies]
+prost-build.workspace = true
+
+[lints]
+workspace = true
