@@ -3,12 +3,14 @@ resolver = "3"
 members = [
     "crates/store-protocol",
     "crates/store-core",
+    "crates/store-http",
     "crates/store-testkit",
     "tools/protogen",
 ]
 default-members = [
     "crates/store-protocol",
     "crates/store-core",
+    "crates/store-http",
     "crates/store-testkit",
 ]
 
@@ -22,6 +24,7 @@ repository = "https://github.com/skkil/store"
 [workspace.dependencies]
 skkil-store-protocol = { path = "crates/store-protocol", version = "0.1.0" }
 skkil-store-core = { path = "crates/store-core", version = "0.1.0", default-features = false }
+skkil-store-http = { path = "crates/store-http", version = "0.1.0" }
 skkil-store-testkit = { path = "crates/store-testkit" }
 prost = "0.14.4"
 prost-build = "0.14.4"
