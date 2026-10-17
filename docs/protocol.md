@@ -98,10 +98,26 @@ server-only columns never break a client.
 Rows created on a device need ids that never collide and that the server
 reproduces when it replays the mutation. Products derive them from the
 mutation: `uuidv8(sha256(client_id ‖ mutation_id ‖ n))` for the n-th id a
-mutation creates (`store-core` provides `derive_id`). Server-originated writes
+mutation creates (`store-core` provides `derive_id`). The input is the 16 raw
+bytes of `client_id`, `mutation_id` as a big-endian u64 and `n` as a
+big-endian u32 counting from 0; the first 16 digest bytes become the UUID with
+version 8 and the RFC 9562 variant. Test vector: client
+`01923e4c-8b1a-7c3d-9e2f-0a1b2c3d4e5f`, mutation 1, n 0 →
+`7c95d028-8ca6-8ddf-b6a6-888317f17cb1`. Server-originated writes
 use random UUIDv7. If a server replay ever creates ids in a different order,
 the device's optimistic rows are replaced by the server's on the next pull, so
 a mismatch is self-healing.
+
+## Clock
+
+`Mutation.hlc` is a hybrid logical clock encoded as
+`(unix_millis << 16) | counter`, with the counter in `0..=0xFFFF`. The client
+takes it when the mutation is made and never changes it. A mutation's wall
+time is `hlc >> 16`: mutators read it from the mutation context (`now()` in
+`store-core`, the decoded `hlc` on the server) instead of the system clock, so
+a mutation made offline at 10:00 and replayed or pushed at 12:00 still records
+10:00. Order still comes from the server's versions; the HLC only decides
+fields declared last-writer-wins.
 
 ## Versioning
 
