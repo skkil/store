@@ -47,6 +47,10 @@ SELECT store_poke(:scope, :version);                   -- after COMMIT, outside 
   `55000`, unless the transaction sets `store.bypass = on` (migrations only).
 - Deletes are logged as `delete` changes, including rows removed by
   `ON DELETE CASCADE`. Tombstone columns are optional.
+- `MutationResult.version` for `DUPLICATE` may be the scope's current head
+  rather than the version that first recorded the mutation.
+- Synced tables must not use deferred constraints: a failure at `COMMIT` can't
+  be turned into a rejection, so it would block that client's queue.
 - Push answers 2xx with one `MutationResult` per mutation. Transport errors
   mean "try the whole batch again"; they never mean "rejected".
 
