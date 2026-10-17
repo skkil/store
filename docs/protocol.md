@@ -58,6 +58,10 @@ SELECT store_poke(:scope, :version);                   -- after COMMIT, outside 
 - `Reset` is returned when the cursor's epoch differs, its hash does not match
   the log, or it is ahead of the head. The client then drops synced rows, pulls
   from version 0 and keeps its pending mutations.
+- Anything that rewinds a scope's log (a restore, a failover that loses
+  commits, a shard move) must bump `store_scope.epoch`. That is what turns a
+  stale cursor into `Reset`; without it, a client whose `min_version` is above
+  the rewound head would wait forever.
 - `Pokes` is a server stream of `{version}` hints for the token's scope. Pokes
   may be lost; clients also pull on start, on reconnect, after pushing and on
   a timer.
