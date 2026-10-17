@@ -13,6 +13,8 @@ import java.util.UUID
 import javax.sql.DataSource
 
 object StoreDatabase {
+    private val MIGRATION = Regex("""V\d+__.+\.sql""")
+
     private val container =
         PostgreSQLContainer("postgres:17-alpine").apply { start() }
 
@@ -32,7 +34,11 @@ object StoreDatabase {
     init {
         val migrations = Path.of(System.getProperty("store.migrations"))
         dataSource.connection.use { connection ->
-            connection.createStatement().use { it.execute(Files.readString(migrations.resolve("V1__store.sql"))) }
+            Files
+                .list(migrations)
+                .use { files -> files.filter { it.fileName.toString().matches(MIGRATION) }.toList() }
+                .sortedBy { it.fileName.toString().substringAfter('V').substringBefore("__").toInt() }
+                .forEach { file -> connection.createStatement().use { it.execute(Files.readString(file)) } }
             connection.createStatement().use {
                 it.execute("CREATE TABLE note (id uuid PRIMARY KEY, scope_id uuid NOT NULL, title text NOT NULL)")
                 it.execute("SELECT store_register('note')")

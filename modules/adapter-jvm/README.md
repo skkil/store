@@ -14,7 +14,7 @@ ES256 sync tokens. Coordinates `org.skkil.store:store-adapter-jvm`.
 ```
 
 Tests start `postgres:17-alpine` with Testcontainers (Docker required) and
-apply `../sql/migrations/V1__store.sql`. Java classes for `skkil.store.v1` are
+apply every `../sql/migrations/V*.sql` in order. Java classes for `skkil.store.v1` are
 generated from `../protocol/proto` at build time.
 
 ## Using it from a product
@@ -25,9 +25,9 @@ Composite build, in the product's `settings.gradle.kts`:
 includeBuild("../../../store/modules/adapter-jvm")
 ```
 
-and `implementation("org.skkil.store:store-adapter-jvm:0.1.0")`. Apply
-`V1__store.sql` as one of the product's own Flyway migrations, then
-`store_register` each synced table.
+and `implementation("org.skkil.store:store-adapter-jvm:0.1.0")`. Copy each
+`../sql/migrations/V*__*.sql` into the product's own Flyway migrations, in
+order, then `store_register` each synced table.
 
 `StoreAutoConfiguration` wires `StoreWritePath`, `MutationRegistry`,
 `RejectionPolicy` (rejects `MutationRejectedException`), `PushHandler` and
