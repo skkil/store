@@ -25,8 +25,8 @@ they land.
 - [ ] 3.6 Builds for wasm32 (SQLite on OPFS) and iOS/Android targets
 
 ## 4. Adapters
-- [ ] 4.1 JVM: write path, mutation registry, Push handler, sync tokens
-- [ ] 4.2 TypeScript driver: transport, poke stream, scheduler, tab lock
+- [x] 4.1 JVM: write path, mutation registry, Push handler, sync tokens
+- [x] 4.2 TypeScript driver: transport, poke stream, scheduler, tab lock
 
 ## 5. Conformance
 - [ ] 5.1 Simulator: N clients, offline windows, rejections, poke loss

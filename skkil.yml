@@ -44,3 +44,9 @@ ci:
       format: ./gradlew spotlessCheck
       test: ./gradlew test
       build: ./gradlew build -x test
+    - name: client-ts
+      dir: modules/client-ts
+      format: pnpm install --frozen-lockfile && pnpm format:check
+      lint: pnpm install --frozen-lockfile && pnpm lint && pnpm check:generated
+      test: pnpm install --frozen-lockfile && pnpm test
+      build: pnpm install --frozen-lockfile && pnpm typecheck && pnpm build
