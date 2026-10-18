@@ -50,3 +50,18 @@ ci:
       lint: pnpm install --frozen-lockfile && pnpm lint && pnpm check:generated
       test: pnpm install --frozen-lockfile && pnpm test
       build: pnpm install --frozen-lockfile && pnpm typecheck && pnpm build
+    - name: core
+      dir: modules/core
+      format: cargo fmt --check
+      lint: >-
+        cargo clippy --workspace --all-targets --locked -- -D warnings &&
+        cargo clippy --target wasm32-unknown-unknown -p skkil-store-core -p skkil-store-http --all-targets --locked -- -D warnings &&
+        cargo run -q -p protogen && git diff --exit-code -- crates/store-protocol/src/generated
+      test: >-
+        cargo test --workspace --locked &&
+        cargo test --target wasm32-unknown-unknown -p skkil-store-core --test wasm --locked
+      build: >-
+        cargo build --workspace --locked &&
+        cargo build --target wasm32-unknown-unknown -p skkil-store-core --locked &&
+        cargo ndk -t arm64-v8a -t x86_64 build -p skkil-store-core --locked &&
+        cargo check --target aarch64-apple-ios --target aarch64-apple-ios-sim -p skkil-store-core --no-default-features --locked

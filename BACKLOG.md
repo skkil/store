@@ -17,12 +17,12 @@ they land.
 - [x] 2.5 Tests on real Postgres, two instances
 
 ## 3. Client core (Rust)
-- [ ] 3.1 Local schema: meta, pending, undo, issues; table registration
-- [ ] 3.2 Mutate with pre-image capture; push request/response
-- [ ] 3.3 Pull: undo, apply versions, ack, replay, rejections → issues, Reset
-- [ ] 3.4 HLC, derived ids, status
-- [ ] 3.5 Native HTTP driver (Pull, Push, Pokes)
-- [ ] 3.6 Builds for wasm32 (SQLite on OPFS) and iOS/Android targets
+- [x] 3.1 Local schema: meta, pending, undo, issues; table registration
+- [x] 3.2 Mutate with pre-image capture; push request/response
+- [x] 3.3 Pull: undo, apply versions, ack, replay, rejections → issues, Reset
+- [x] 3.4 HLC, derived ids, status
+- [x] 3.5 Native HTTP driver (Pull, Push, Pokes)
+- [x] 3.6 Builds for wasm32 (SQLite on OPFS) and iOS/Android targets
 
 ## 4. Adapters
 - [x] 4.1 JVM: write path, mutation registry, Push handler, sync tokens
