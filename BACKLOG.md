@@ -29,8 +29,8 @@ they land.
 - [x] 4.2 TypeScript driver: transport, poke stream, scheduler, tab lock
 
 ## 5. Conformance
-- [ ] 5.1 Simulator: N clients, offline windows, rejections, poke loss
-- [ ] 5.2 Suite over the wire against a product server; L1–L4 checks
+- [x] 5.1 Simulator: N clients, offline windows, rejections, poke loss
+- [x] 5.2 Suite over the wire against a product server; L1–L4 checks
 
 ## 6. Release
 - [ ] 6.1 `skkil ci` green; tag v0.1.0

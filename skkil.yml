@@ -65,3 +65,9 @@ ci:
         cargo build --target wasm32-unknown-unknown -p skkil-store-core --locked &&
         cargo ndk -t arm64-v8a -t x86_64 build -p skkil-store-core --locked &&
         cargo check --target aarch64-apple-ios --target aarch64-apple-ios-sim -p skkil-store-core --no-default-features --locked
+    - name: conformance
+      dir: modules/conformance
+      format: test -z "$(gofmt -l .)"
+      lint: go vet ./... && go tool staticcheck ./... && buf generate && git diff --exit-code -- gen
+      test: go test -race ./...
+      build: go build -o /dev/null ./cmd/conformance && go build -o /dev/null ./cmd/reference
