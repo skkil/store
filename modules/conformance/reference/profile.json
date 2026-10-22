@@ -1,0 +1,26 @@
+{
+  "schema_version": 1,
+  "mutations": [
+    { "name": "todo.create", "kind": "create", "weight": 4, "args": { "title": "{{text}}" }, "creates": ["todo"] },
+    {
+      "name": "todo.create",
+      "kind": "create",
+      "weight": 2,
+      "args": { "title": "{{text}}", "items": ["{{text}}", "{{text}}"] },
+      "creates": ["todo", "todo_item", "todo_item"]
+    },
+    {
+      "name": "item.create",
+      "kind": "create",
+      "weight": 3,
+      "args": { "todo_id": "{{row:todo}}", "text": "{{text}}" },
+      "creates": ["todo_item"]
+    },
+    { "name": "todo.rename", "kind": "update", "weight": 4, "args": { "id": "{{row:todo}}", "title": "{{text}}" } },
+    { "name": "todo.complete", "kind": "update", "weight": 2, "args": { "id": "{{row:todo}}" } },
+    { "name": "todo.delete", "kind": "delete", "weight": 1, "args": { "id": "{{row:todo}}" } },
+    { "name": "todo.create", "kind": "reject", "weight": 1, "args": { "title": "" } },
+    { "name": "todo.create", "kind": "reject", "weight": 1, "args": { "title": "{{text}}", "items": ["{{text}}", " "] } },
+    { "name": "todo.rename", "kind": "reject", "weight": 1, "args": { "id": "{{row:todo}}", "title": "" } }
+  ]
+}

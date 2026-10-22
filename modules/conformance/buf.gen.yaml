@@ -1,0 +1,15 @@
+version: v2
+inputs:
+  - directory: ../protocol/proto
+managed:
+  enabled: true
+  override:
+    - file_option: go_package
+      value: github.com/skkil/store/modules/conformance/gen/storev1;storev1
+plugins:
+  - local: [go, tool, protoc-gen-go]
+    out: .
+    opt: module=github.com/skkil/store/modules/conformance
+  - local: [go, tool, protoc-gen-connect-go]
+    out: .
+    opt: module=github.com/skkil/store/modules/conformance
