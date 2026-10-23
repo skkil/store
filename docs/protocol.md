@@ -70,6 +70,21 @@ SELECT store_poke(:scope, :version);                   -- after COMMIT, outside 
   may be lost; clients also pull on start, on reconnect, after pushing and on
   a timer.
 
+## Hash chain
+
+Each version's `hash` chains every earlier one, so a cursor names one exact
+history. With `‖` for byte concatenation and SHA-256 throughout:
+
+```
+body    = sha256(join("\n", seq "|" table "|" row_id "|" op "|" data))   -- commit, seq from 1, data = jsonb::text or ""
+        = sha256(reason)                                               -- rejection
+hash(v) = sha256(hash(v-1) ‖ utf8(v "|" client_id "|" mutation_id "|" kind) ‖ body)
+```
+
+`hash(0)` is empty. `data` is Postgres `jsonb::text` byte for byte, so only
+readers of the raw log (the service, the conformance suite) can recompute it;
+clients store the hash and send it back.
+
 ## Sync token
 
 The store service never sees the product's users. The product server issues
