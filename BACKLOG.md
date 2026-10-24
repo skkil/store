@@ -33,4 +33,4 @@ they land.
 - [x] 5.2 Suite over the wire against a product server; L1–L4 checks
 
 ## 6. Release
-- [ ] 6.1 `skkil ci` green; tag v0.1.0
+- [x] 6.1 `skkil ci` green; tag v0.1.0
