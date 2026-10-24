@@ -42,6 +42,22 @@ SELECT store_poke(:scope, :version);                   -- after COMMIT, outside 
 
 - Writes the product makes on its own (REST endpoints, jobs) use
   `store_begin_server(:scope)` instead of `store_begin`, then `store_end()`.
+- Products call only the functions below; `store_*` tables and the `store.*`
+  settings are internal and may change in any release.
+
+| Function (schema) | Use |
+| --- | --- |
+| `store_end_if_changed() → bigint` (3) | Closes an open server write: like `store_end()` when it captured a row change, otherwise closes without a version and returns `NULL`. |
+| `store_abandon()` (3) | Closes an open server write without a version. It must have captured no row change (roll back to a savepoint first). |
+| `store_is_open() → boolean` (3) | Whether a mutation or server write is open on this transaction, so nested writes can join it. |
+| `store_claim_client(:scope, :client) → boolean` (3) | Binds a client to a scope for life, as its first `store_begin` would. `false` when it already belongs to another scope; call it before issuing a sync token. |
+| `store_drop_scope(:scope)` (3) | Removes a scope with its clients and log after the product deleted its rows (account deletion). A device that syncs it again starts over. |
+
+- A device mutation always ends with `store_end()` or `store_reject()`, so its
+  client is acked: `store_abandon()` and `store_end_if_changed()` on one, or
+  `store_abandon()` after captured changes, raise `22023`. `store_drop_scope`
+  on the scope of the open mutation raises `55000`; claiming the server client
+  id raises `22023`.
 - `store_register(table, id_column, excluded_columns)` puts a table under sync.
   From then on any write to it outside an open mutation raises
   `55000`, unless the transaction sets `store.bypass = on` (migrations only).
@@ -105,7 +121,8 @@ Clients send it as `Authorization: Bearer <token>` to `Pull` and `Pokes`.
 ## Row images
 
 A change's `data` is the row as JSON (`to_jsonb`), minus the registered
-excluded columns. Clients upsert the columns they know and ignore the rest, so
+excluded columns. An `UPDATE` whose image minus those columns is unchanged is
+not logged (schema 3; before it, only fully identical rows were skipped). Clients upsert the columns they know and ignore the rest, so
 server-only columns never break a client.
 
 ## Ids
