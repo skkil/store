@@ -6,6 +6,8 @@ import org.skkil.store.support.StoreDatabase
 import org.skkil.store.support.StoreDatabase.transactions
 import java.util.UUID
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class StoreWritePathTest {
@@ -153,6 +155,113 @@ class StoreWritePathTest {
     @Test
     fun `the write path refuses to run outside a transaction`() {
         assertThrows<IllegalStateException> { writePath.begin(scope, client, 1) }
+    }
+
+    @Test
+    fun `endIfChanged closes an unchanged server write without a version or poke`() {
+        StoreDatabase.listening { listener ->
+            val version =
+                transactions.execute {
+                    writePath.beginServer(scope)
+                    writePath.endIfChanged().also { assertFalse(writePath.isOpen()) }
+                }
+
+            assertNull(version)
+            assertEquals(0, StoreDatabase.headVersion(scope))
+            assertEquals(emptyList(), listener.next(500))
+        }
+    }
+
+    @Test
+    fun `endIfChanged logs and pokes a server write that changed rows`() {
+        StoreDatabase.listening { listener ->
+            val version =
+                transactions.execute {
+                    writePath.beginServer(scope)
+                    StoreDatabase.insertNote(scope, "server")
+                    writePath.endIfChanged()
+                }
+
+            assertEquals(1, version)
+            assertEquals(listOf("$scope:1"), listener.next())
+        }
+    }
+
+    @Test
+    fun `abandon closes a server write rolled back to its savepoint`() {
+        transactions.execute {
+            writePath.beginServer(scope)
+            val savepoint = writePath.savepoint()
+            StoreDatabase.insertNote(scope, "discarded")
+            writePath.rollbackTo(savepoint)
+            writePath.abandon()
+            assertFalse(writePath.isOpen())
+        }
+
+        assertEquals(emptyList(), StoreDatabase.notes(scope))
+        assertEquals(0, StoreDatabase.headVersion(scope))
+    }
+
+    @Test
+    fun `abandoning a device mutation or captured changes raises InvalidStoreArgumentException`() {
+        assertThrows<InvalidStoreArgumentException> {
+            transactions.execute {
+                writePath.begin(scope, client, 1)
+                writePath.abandon()
+            }
+        }
+        assertThrows<InvalidStoreArgumentException> {
+            transactions.execute {
+                writePath.begin(scope, client, 1)
+                writePath.endIfChanged()
+            }
+        }
+        assertThrows<InvalidStoreArgumentException> {
+            transactions.execute {
+                writePath.beginServer(scope)
+                StoreDatabase.insertNote(scope, "kept")
+                writePath.abandon()
+            }
+        }
+    }
+
+    @Test
+    fun `isOpen follows begin and end`() {
+        transactions.execute {
+            assertFalse(writePath.isOpen())
+            writePath.begin(scope, client, 1)
+            assertTrue(writePath.isOpen())
+            writePath.end()
+            assertFalse(writePath.isOpen())
+        }
+    }
+
+    @Test
+    fun `claimClient binds a client to its first scope`() {
+        assertTrue(writePath.claimClient(scope, client))
+        assertTrue(writePath.claimClient(scope, client))
+        assertFalse(writePath.claimClient(UUID.randomUUID(), client))
+        assertThrows<InvalidStoreArgumentException> { writePath.claimClient(scope, UUID(0, 0)) }
+        assertEquals(1, applied(1, "a"))
+    }
+
+    @Test
+    fun `dropScope removes the scope with its clients and log`() {
+        applied(1, "a")
+        transactions.execute {
+            writePath.beginServer(scope)
+            StoreDatabase.jdbc
+                .sql("DELETE FROM note WHERE scope_id = ?")
+                .param(scope)
+                .update()
+            writePath.end()
+        }
+
+        writePath.dropScope(scope)
+
+        assertEquals(0, StoreDatabase.headVersion(scope))
+        assertEquals(emptyList(), StoreDatabase.logKinds(scope))
+        assertTrue(writePath.claimClient(UUID.randomUUID(), client))
     }
 
     private fun applied(mutationId: Long, title: String): Long =

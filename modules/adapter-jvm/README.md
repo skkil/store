@@ -25,7 +25,7 @@ Composite build, in the product's `settings.gradle.kts`:
 includeBuild("../../../store/modules/adapter-jvm")
 ```
 
-and `implementation("org.skkil.store:store-adapter-jvm:0.1.0")`. Copy each
+and `implementation("org.skkil.store:store-adapter-jvm:0.2.0")`. Copy each
 `../sql/migrations/V*__*.sql` into the product's own Flyway migrations, in
 order, then `store_register` each synced table.
 
@@ -109,8 +109,16 @@ transactionTemplate.execute {
 }
 ```
 
-`end()` and `reject()` schedule `store_poke` for after the commit, on a
-separate connection; a failed poke is logged and otherwise ignored.
+`endIfChanged()` closes it without a version (and returns null) when it changed
+no synced row, and `abandon()` closes an unchanged write outright. `isOpen()`
+tells whether a mutation is already open, so a nested write can join it.
+`claimClient(scope, client)` binds a client before you issue its sync token
+(false when another scope owns it), and `dropScope(scope)` removes a scope's
+clients and log after account deletion.
+
+`end()`, `endIfChanged()` (when it logs) and `reject()` schedule `store_poke`
+for after the commit, on a separate connection; a failed poke is logged and
+otherwise ignored.
 
 ### Sync tokens
 
@@ -124,7 +132,8 @@ issuer.jwks()                               // or serve this at a JWKS URL
 
 ```
 src/main/kotlin/org/skkil/store/
-  writepath/  StoreWritePath (begin, beginServer, end, reject, savepoints, poke),
+  writepath/  StoreWritePath (begin, beginServer, end, endIfChanged, abandon, reject,
+              isOpen, claimClient, dropScope, savepoints, poke),
               Begin, StoreException and its SQLSTATE subclasses, StoreSqlErrors
   push/       MutationRegistry, MutationHandler, MutationContext, DerivedIds,
               HybridLogicalClock, RejectionPolicy, MutationRejectedException,

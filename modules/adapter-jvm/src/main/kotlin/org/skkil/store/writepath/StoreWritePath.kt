@@ -14,7 +14,8 @@ import javax.sql.DataSource
  *
  * Every method except [poke] runs on the connection of the caller's Spring-managed transaction,
  * so the mutation's row changes, the scope version and the idempotency record commit together.
- * [end] and [reject] schedule `store_poke` to run after that transaction commits.
+ * [end], [endIfChanged] (when it logs a version) and [reject] schedule `store_poke` to run after that
+ * transaction commits.
  */
 public class StoreWritePath(
     private val dataSource: DataSource,
@@ -47,6 +48,58 @@ public class StoreWritePath(
 
     /** Closes the open mutation as applied and returns its version. */
     public fun end(): Long = close { jdbc.sql("SELECT store_end()").query(Long::class.javaObjectType).single() }
+
+    /**
+     * Closes the open server write: as [end] when it changed a synced row, returning the new version, otherwise
+     * without a version, returning null. Device mutations must [end] or [reject] instead.
+     */
+    public fun endIfChanged(): Long? {
+        requireTransaction()
+        val scope = openScope()
+        val version =
+            translated {
+                jdbc
+                    .sql("SELECT store_end_if_changed()")
+                    .query(Long::class.javaObjectType)
+                    .list()
+                    .firstOrNull()
+            }
+        version?.let { pokeAfterCommit(scope, it) }
+        return version
+    }
+
+    /**
+     * Closes the open server write without a version. It must not have changed a synced row: roll back to a
+     * savepoint first. Device mutations must [end] or [reject] instead.
+     */
+    public fun abandon() {
+        requireTransaction()
+        translated { jdbc.sql("SELECT store_abandon()").query().singleRow() }
+    }
+
+    /** True while a device mutation or server write is open on the caller's transaction. */
+    public fun isOpen(): Boolean {
+        requireTransaction()
+        return jdbc.sql("SELECT store_is_open()").query(Boolean::class.javaObjectType).single()
+    }
+
+    /**
+     * Binds [client] to [scope] for life, as its first mutation would, and returns false when it already belongs to
+     * another scope. Call it before issuing a sync token.
+     */
+    public fun claimClient(scope: UUID, client: UUID): Boolean =
+        translated {
+            jdbc
+                .sql("SELECT store_claim_client(?, ?)")
+                .params(scope, client)
+                .query(Boolean::class.javaObjectType)
+                .single()
+        }
+
+    /** Removes [scope] with its clients and log, once the product has deleted its rows. */
+    public fun dropScope(scope: UUID) {
+        translated { jdbc.sql("SELECT store_drop_scope(?)").param(scope).query().singleRow() }
+    }
 
     /**
      * Records the open mutation as rejected with [reason] and returns its version.
@@ -110,12 +163,16 @@ public class StoreWritePath(
         requireTransaction()
         val scope = openScope()
         val version = translated(statement)
+        pokeAfterCommit(scope, version)
+        return version
+    }
+
+    private fun pokeAfterCommit(scope: UUID, version: Long) {
         TransactionSynchronizationManager.registerSynchronization(
             object : TransactionSynchronization {
                 override fun afterCommit() = poke(scope, version)
             },
         )
-        return version
     }
 
     private fun openScope(): UUID {
