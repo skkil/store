@@ -34,3 +34,9 @@ they land.
 
 ## 6. Release
 - [x] 6.1 `skkil ci` green; tag v0.1.0
+
+## 7. v0.2.0: product API
+- [x] 7.1 Write-path functions for what products reached into internals for
+      (`store_end_if_changed`, `store_abandon`, `store_is_open`,
+      `store_claim_client`, `store_drop_scope`), excluded-only updates not
+      logged; adapter-jvm and Go helpers; `skkil ci` green; tag v0.2.0
