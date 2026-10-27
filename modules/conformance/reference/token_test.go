@@ -42,6 +42,25 @@ func TestTokenEndpointIssuesVerifiableTokensPerUser(t *testing.T) {
 	}
 }
 
+func TestTokenEndpointRefusesAClientOfAnotherUser(t *testing.T) {
+	h := newHarness(t)
+	client := uuid.NewString()
+	for _, tc := range []struct {
+		user string
+		want int
+	}{{"ada", http.StatusOK}, {"ada", http.StatusOK}, {"bob", http.StatusConflict}} {
+		resp, err := http.Post(h.url+reference.TokenPath, "application/json",
+			strings.NewReader(`{"user":"`+tc.user+`","client_id":"`+client+`"}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != tc.want {
+			t.Fatalf("%s: status %s, want %d", tc.user, resp.Status, tc.want)
+		}
+	}
+}
+
 func TestTokenEndpointRejectsBadRequests(t *testing.T) {
 	h := newHarness(t)
 	for _, body := range []string{`nope`, `{"user":"","client_id":"` + uuid.NewString() + `"}`, `{"user":"ada","client_id":"x"}`} {

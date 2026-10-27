@@ -63,6 +63,62 @@ func End(ctx context.Context, tx pgx.Tx) (uint64, error) {
 	return uint64(version), nil
 }
 
+// EndIfChanged calls store_end_if_changed on an open server write: the new
+// version when it changed a synced row, otherwise ok is false and the write
+// closes without a version.
+func EndIfChanged(ctx context.Context, tx pgx.Tx) (version uint64, ok bool, err error) {
+	var v *int64
+	if err := tx.QueryRow(ctx, "SELECT store_end_if_changed()").Scan(&v); err != nil {
+		return 0, false, fmt.Errorf("store_end_if_changed: %w", err)
+	}
+	if v == nil {
+		return 0, false, nil
+	}
+	return uint64(*v), true, nil
+}
+
+// Abandon calls store_abandon, closing an open server write that changed no
+// synced row without a version.
+func Abandon(ctx context.Context, tx pgx.Tx) error {
+	if _, err := tx.Exec(ctx, "SELECT store_abandon()"); err != nil {
+		return fmt.Errorf("store_abandon: %w", err)
+	}
+	return nil
+}
+
+// IsOpen calls store_is_open: whether a mutation is open on tx.
+func IsOpen(ctx context.Context, tx pgx.Tx) (bool, error) {
+	var open bool
+	if err := tx.QueryRow(ctx, "SELECT store_is_open()").Scan(&open); err != nil {
+		return false, fmt.Errorf("store_is_open: %w", err)
+	}
+	return open, nil
+}
+
+// Querier runs a query on its own connection or transaction.
+type Querier interface {
+	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
+}
+
+// ClaimClient calls store_claim_client, binding client to scope for life. It
+// reports false when the client already belongs to another scope.
+func ClaimClient(ctx context.Context, db Querier, scope, client uuid.UUID) (bool, error) {
+	var ok bool
+	if err := db.QueryRow(ctx, "SELECT store_claim_client($1, $2)", scope, client).Scan(&ok); err != nil {
+		return false, fmt.Errorf("store_claim_client: %w", err)
+	}
+	return ok, nil
+}
+
+// DropScope calls store_drop_scope, removing scope with its clients and log
+// once the product has deleted its rows.
+func DropScope(ctx context.Context, db Execer, scope uuid.UUID) error {
+	if _, err := db.Exec(ctx, "SELECT store_drop_scope($1)", scope); err != nil {
+		return fmt.Errorf("store_drop_scope: %w", err)
+	}
+	return nil
+}
+
 // RecordRejection calls store_reject and returns the version that records it.
 func RecordRejection(ctx context.Context, tx pgx.Tx, reason string) (uint64, error) {
 	var version int64

@@ -5,6 +5,9 @@ import (
 	"net/http"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/skkil/store/modules/conformance/writepath"
 )
 
 // TokenRequest asks for a sync token for one client of one user.
@@ -29,14 +32,17 @@ func ScopeOf(user string) uuid.UUID {
 
 // TokenHandler serves POST /sync-token. The reference product has no
 // sign-in, so it trusts the user named in the request; a real product issues
-// tokens only to the signed-in user.
+// tokens only to the signed-in user. A client id already bound to another
+// user's scope is refused with 409.
 type TokenHandler struct {
 	issuer *TokenIssuer
+	pool   *pgxpool.Pool
 }
 
-// NewTokenHandler returns a TokenHandler signing with issuer.
-func NewTokenHandler(issuer *TokenIssuer) *TokenHandler {
-	return &TokenHandler{issuer: issuer}
+// NewTokenHandler returns a TokenHandler signing with issuer and claiming
+// clients in pool.
+func NewTokenHandler(issuer *TokenIssuer, pool *pgxpool.Pool) *TokenHandler {
+	return &TokenHandler{issuer: issuer, pool: pool}
 }
 
 func (h *TokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -51,6 +57,15 @@ func (h *TokenHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	scope := ScopeOf(req.User)
+	claimed, err := writepath.ClaimClient(r.Context(), h.pool, scope, client)
+	if err != nil {
+		http.Error(w, "could not claim the client", http.StatusInternalServerError)
+		return
+	}
+	if !claimed {
+		http.Error(w, "client_id belongs to another user", http.StatusConflict)
+		return
+	}
 	token, err := h.issuer.Issue(scope, client)
 	if err != nil {
 		http.Error(w, "could not sign the token", http.StatusInternalServerError)

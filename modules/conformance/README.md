@@ -247,8 +247,10 @@ result, err := w.Apply(ctx, scope, client, mutationID, func(ctx context.Context,
 other error aborts the transaction, so the client retries the batch.
 `ApplyServer` records a write the product makes on its own. `DeriveID` matches
 `derive_id` in `store-core`. The single statements (`Begin`, `End`,
-`RecordRejection`, …) are exported for products that manage transactions
-themselves.
+`EndIfChanged`, `Abandon`, `IsOpen`, `RecordRejection`, `ClaimClient`,
+`DropScope`, …) are exported for products that manage transactions
+themselves. The reference token endpoint claims the client first and answers
+409 for a client id another user owns.
 
 ## Develop
 

@@ -41,7 +41,7 @@ func NewHandler(ctx context.Context, cfg Config) (http.Handler, error) {
 	}
 	mux := http.NewServeMux()
 	mux.Handle(storev1connect.NewPushServiceHandler(NewPushHandler(cfg.Issuer, Todos(), applier, cfg.Logger)))
-	mux.Handle("POST "+TokenPath, NewTokenHandler(cfg.Issuer))
+	mux.Handle("POST "+TokenPath, NewTokenHandler(cfg.Issuer, cfg.Pool))
 	mux.HandleFunc("GET "+PublicKeyPath, func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/x-pem-file")
 		_, _ = w.Write([]byte(publicKey))
