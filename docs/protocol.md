@@ -52,6 +52,8 @@ SELECT store_poke(:scope, :version);                   -- after COMMIT, outside 
 | `store_is_open() → boolean` (3) | Whether a mutation or server write is open on this transaction, so nested writes can join it. |
 | `store_claim_client(:scope, :client) → boolean` (3) | Binds a client to a scope for life, as its first `store_begin` would. `false` when it already belongs to another scope; call it before issuing a sync token. |
 | `store_drop_scope(:scope)` (3) | Removes a scope with its clients and log after the product deleted its rows (account deletion). A device that syncs it again starts over. |
+| `store_capture_existing(:table, :column, :values) → integer` (4) | Inside an open mutation, logs an `upsert` for every row of a registered table whose `:column` is one of `:values` (every row when both are `NULL`), in id order, and returns how many. See "Baselining a scope". |
+| `store_bump_epoch(:scope) → integer` (4) | Moves the scope to its next epoch so every older cursor gets `Reset`; returns it, or `NULL` when the scope has no log yet. |
 
 - A device mutation always ends with `store_end()` or `store_reject()`, so its
   client is acked: `store_abandon()` and `store_end_if_changed()` on one, or
@@ -70,6 +72,44 @@ SELECT store_poke(:scope, :version);                   -- after COMMIT, outside 
 - Push answers 2xx with one `MutationResult` per mutation. Transport errors
   mean "try the whole batch again"; they never mean "rejected".
 
+## Baselining a scope
+
+A device that pulls from version 0 receives only what the log holds. Rows the
+log never captured are invisible to it: rows written before their table was
+registered (a product adopting store with existing data) and rows rewritten
+under `store.bypass` (a data migration). To baseline a scope, the product runs
+one server write that captures them:
+
+```sql
+BEGIN;
+SELECT store_begin_server(:scope);
+SELECT store_capture_existing('project', 'user_id', ARRAY[:user]);               -- parents first
+SELECT store_capture_existing('task', 'user_id', ARRAY[:user]);
+SELECT store_capture_existing('task_note', 'task_id', ARRAY(SELECT id::text FROM task WHERE user_id = :user));
+SELECT store_end();
+COMMIT;
+SELECT store_poke(:scope, :version);
+```
+
+- Each captured row becomes an ordinary `upsert` with the image the capture
+  trigger would log (excluded columns removed), so clients apply it like any
+  other change and the hash chain covers it. Rows come in id order, so the
+  same rows always hash the same.
+- `:values` are bound as data and cast to the column's type, and `:column`
+  must name a column of the table; neither is ever run as SQL. Tables without
+  the scope column pass the ids of their parent rows, as above.
+- Capture parents before children, so a client that applies changes in order
+  with foreign keys on never sees an orphan.
+- A baseline duplicates rows the log already holds; that is harmless, since
+  upserts are idempotent. It never deletes: rows removed outside the log stay
+  on devices until a delete for them is logged.
+- `store_capture_existing` on a table that is not registered, an unknown
+  column, or only one of `:column` and `:values` raises `22023`; outside an
+  open mutation it raises `55000`.
+- A restore replaces rows through the write path (so its deletes are logged),
+  then calls `store_bump_epoch(:scope)` and baselines in the same
+  transaction, so every device resets onto the restored rows.
+
 ## Read path (store service)
 
 - `Pull(cursor)` returns the versions after `cursor.version` in order, each
@@ -79,9 +119,9 @@ SELECT store_poke(:scope, :version);                   -- after COMMIT, outside 
   the log, or it is ahead of the head. The client then drops synced rows, pulls
   from version 0 and keeps its pending mutations.
 - Anything that rewinds a scope's log (a restore, a failover that loses
-  commits, a shard move) must bump `store_scope.epoch`. That is what turns a
-  stale cursor into `Reset`; without it, a client whose `min_version` is above
-  the rewound head would wait forever.
+  commits, a shard move) must call `store_bump_epoch(:scope)`. That is what
+  turns a stale cursor into `Reset`; without it, a client whose `min_version`
+  is above the rewound head would wait forever.
 - `Pokes` is a server stream of `{version}` hints for the token's scope. Pokes
   may be lost; clients also pull on start, on reconnect, after pushing and on
   a timer.

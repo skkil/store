@@ -303,3 +303,43 @@ func TestPullGivesUpWhenMinVersionNeverArrives(t *testing.T) {
 		t.Fatalf("waited %s", elapsed)
 	}
 }
+
+func TestPullServesBackfilledRowsAsUpserts(t *testing.T) {
+	f := newFixture(t)
+	ctx := context.Background()
+	note := uuid.NewString()
+	if _, err := f.db.Pool.Exec(ctx, `
+		BEGIN;
+		SET LOCAL store.bypass = on;
+		INSERT INTO note (id, scope_id, title, secret) VALUES ('`+note+`', '`+f.id.Scope+`', 'before sync', 'hidden');
+		COMMIT;`); err != nil {
+		t.Fatal(err)
+	}
+	if got := entries(t, f.pull(t, pull.Request{})); len(got.GetVersions()) != 0 {
+		t.Fatalf("an unlogged row was served: %v", got)
+	}
+	if _, err := f.writer.ServerWrite(ctx, f.id.Scope, func(tx pgx.Tx) error {
+		_, err := tx.Exec(ctx, "SELECT store_capture_existing('note', 'scope_id', $1)", []string{f.id.Scope})
+		return err
+	}); err != nil {
+		t.Fatal(err)
+	}
+	versions := entries(t, f.pull(t, pull.Request{})).GetVersions()
+	if len(versions) != 1 || len(versions[0].GetChanges()) != 1 {
+		t.Fatalf("versions %v", versions)
+	}
+	change := versions[0].GetChanges()[0]
+	if change.GetOp() != storev1.Change_OP_UPSERT || change.GetTable() != "note" || change.GetRowId() != note {
+		t.Fatalf("change %v", change)
+	}
+	var row map[string]any
+	if err := json.Unmarshal(change.GetData(), &row); err != nil {
+		t.Fatal(err)
+	}
+	if row["title"] != "before sync" || row["scope_id"] != f.id.Scope {
+		t.Fatalf("row %v", row)
+	}
+	if _, ok := row["secret"]; ok {
+		t.Fatal("an excluded column was served")
+	}
+}
