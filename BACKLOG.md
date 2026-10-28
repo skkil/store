@@ -40,3 +40,9 @@ they land.
       (`store_end_if_changed`, `store_abandon`, `store_is_open`,
       `store_claim_client`, `store_drop_scope`), excluded-only updates not
       logged; adapter-jvm and Go helpers; `skkil ci` green; tag v0.2.0
+
+## 8. v0.3.0: baselines
+- [x] 8.1 Schema 4: `store_capture_existing` logs rows the log never captured
+      (pre-registration data, `store.bypass` rewrites) as a scope's baseline,
+      `store_bump_epoch` instead of updating `store_scope`; adapter-jvm and Go
+      helpers, the suite bumps epochs through it; `skkil ci` green; tag v0.3.0
