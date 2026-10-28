@@ -25,7 +25,7 @@ Composite build, in the product's `settings.gradle.kts`:
 includeBuild("../../../store/modules/adapter-jvm")
 ```
 
-and `implementation("org.skkil.store:store-adapter-jvm:0.2.0")`. Copy each
+and `implementation("org.skkil.store:store-adapter-jvm:0.3.0")`. Copy each
 `../sql/migrations/V*__*.sql` into the product's own Flyway migrations, in
 order, then `store_register` each synced table.
 
@@ -116,6 +116,10 @@ tells whether a mutation is already open, so a nested write can join it.
 (false when another scope owns it), and `dropScope(scope)` removes a scope's
 clients and log after account deletion.
 
+`captureExisting(table, column, values)` logs an upsert in the open write for every row of a registered table
+whose `column` is one of `values` (every row without them), to baseline rows the log never captured; see
+"Baselining a scope" in `docs/protocol.md`. `bumpEpoch(scope)` makes every older cursor reset, after a restore.
+
 `end()`, `endIfChanged()` (when it logs) and `reject()` schedule `store_poke`
 for after the commit, on a separate connection; a failed poke is logged and
 otherwise ignored.
@@ -133,7 +137,7 @@ issuer.jwks()                               // or serve this at a JWKS URL
 ```
 src/main/kotlin/org/skkil/store/
   writepath/  StoreWritePath (begin, beginServer, end, endIfChanged, abandon, reject,
-              isOpen, claimClient, dropScope, savepoints, poke),
+              isOpen, claimClient, dropScope, captureExisting, bumpEpoch, savepoints, poke),
               Begin, StoreException and its SQLSTATE subclasses, StoreSqlErrors
   push/       MutationRegistry, MutationHandler, MutationContext, DerivedIds,
               HybridLogicalClock, RejectionPolicy, MutationRejectedException,

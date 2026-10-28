@@ -264,6 +264,49 @@ class StoreWritePathTest {
         assertTrue(writePath.claimClient(UUID.randomUUID(), client))
     }
 
+    @Test
+    fun `captureExisting logs unlogged rows in id order without excluded columns`() {
+        val ids = List(3) { UUID.randomUUID() }
+        ids.forEachIndexed { i, id -> StoreDatabase.insertUnlogged(scope, "old $i", id) }
+        StoreDatabase.insertUnlogged(UUID.randomUUID(), "another scope")
+
+        val (captured, version) =
+            transactions.execute {
+                writePath.beginServer(scope)
+                writePath.captureExisting("note", "scope_id", listOf(scope)) to writePath.end()
+            }
+
+        assertEquals(3, captured)
+        assertEquals(1, version)
+        val patches = StoreDatabase.patches(scope)
+        assertEquals(ids.map(UUID::toString).sorted(), patches.map { it.substringBefore(' ') })
+        assertTrue(patches.none { "secret" in it })
+        assertTrue(patches.all { "\"scope_id\": \"$scope\"" in it })
+    }
+
+    @Test
+    fun `captureExisting of an unregistered table raises InvalidStoreArgumentException`() {
+        StoreDatabase.jdbc.sql("CREATE TABLE IF NOT EXISTS unsynced (id uuid PRIMARY KEY)").update()
+
+        assertThrows<InvalidStoreArgumentException> {
+            transactions.execute {
+                writePath.beginServer(scope)
+                writePath.captureExisting("unsynced")
+            }
+        }
+        assertThrows<MutationNotOpenException> { transactions.execute { writePath.captureExisting("note") } }
+    }
+
+    @Test
+    fun `bumpEpoch moves a scope with a log to its next epoch`() {
+        assertNull(writePath.bumpEpoch(scope))
+        applied(1, "a")
+
+        assertEquals(2, writePath.bumpEpoch(scope))
+        assertEquals(2, StoreDatabase.epoch(scope))
+        assertEquals(1, StoreDatabase.headVersion(scope))
+    }
+
     private fun applied(mutationId: Long, title: String): Long =
         transactions.execute {
             assertEquals(Begin.BEGUN, writePath.begin(scope, client, mutationId))

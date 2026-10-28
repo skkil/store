@@ -102,6 +102,33 @@ public class StoreWritePath(
     }
 
     /**
+     * Logs an upsert in the open mutation for every row of the registered [table] whose [column] is one of [values]
+     * (every row when both are null), in id order, with the image the capture trigger would log, and returns how many
+     * rows it logged. It baselines rows the log never captured; [values] are bound as data, never run as SQL.
+     */
+    public fun captureExisting(table: String, column: String? = null, values: Collection<Any>? = null): Int {
+        requireTransaction()
+        return translated {
+            jdbc
+                .sql("SELECT store_capture_existing(?::regclass, ?, ?::text[])")
+                .params(listOf(table, column, values?.map(Any::toString)?.toTypedArray()))
+                .query(Int::class.javaObjectType)
+                .single()
+        }
+    }
+
+    /** Moves [scope] to its next epoch, so every older cursor resets, and returns it; null when it has no log yet. */
+    public fun bumpEpoch(scope: UUID): Int? =
+        translated {
+            jdbc
+                .sql("SELECT store_bump_epoch(?)")
+                .param(scope)
+                .query(Int::class.javaObjectType)
+                .list()
+                .firstOrNull()
+        }
+
+    /**
      * Records the open mutation as rejected with [reason] and returns its version.
      * Roll back to a savepoint taken right after [begin] first, so none of its row changes stay.
      */
