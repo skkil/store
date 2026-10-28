@@ -119,6 +119,37 @@ func DropScope(ctx context.Context, db Execer, scope uuid.UUID) error {
 	return nil
 }
 
+// CaptureExisting calls store_capture_existing inside an open mutation: it
+// logs an upsert for every row of the registered table whose column is one
+// of values (every row when column is empty), in id order, and returns how
+// many. It baselines rows the log never captured.
+func CaptureExisting(ctx context.Context, tx pgx.Tx, table, column string, values []string) (int, error) {
+	var n int
+	var err error
+	if column == "" {
+		err = tx.QueryRow(ctx, "SELECT store_capture_existing($1::regclass)", table).Scan(&n)
+	} else {
+		err = tx.QueryRow(ctx, "SELECT store_capture_existing($1::regclass, $2, $3)", table, column, values).Scan(&n)
+	}
+	if err != nil {
+		return 0, fmt.Errorf("store_capture_existing: %w", err)
+	}
+	return n, nil
+}
+
+// BumpEpoch calls store_bump_epoch, so every older cursor of scope resets.
+// ok is false when the scope has no log yet.
+func BumpEpoch(ctx context.Context, db Querier, scope uuid.UUID) (epoch uint32, ok bool, err error) {
+	var e *int32
+	if err := db.QueryRow(ctx, "SELECT store_bump_epoch($1)", scope).Scan(&e); err != nil {
+		return 0, false, fmt.Errorf("store_bump_epoch: %w", err)
+	}
+	if e == nil {
+		return 0, false, nil
+	}
+	return uint32(*e), true, nil
+}
+
 // RecordRejection calls store_reject and returns the version that records it.
 func RecordRejection(ctx context.Context, tx pgx.Tx, reason string) (uint64, error) {
 	var version int64

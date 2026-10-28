@@ -99,3 +99,46 @@ func TestClaimClientAndDropScope(t *testing.T) {
 		t.Fatalf("claim after drop: %v %v", ok, err)
 	}
 }
+
+func TestCaptureExistingAndBumpEpoch(t *testing.T) {
+	db := stacktest.NewDatabase(t)
+	ctx := context.Background()
+	scope, todo := uuid.New(), uuid.Must(uuid.NewV7())
+	if _, _, err := writepath.BumpEpoch(ctx, db.Pool, scope); err != nil {
+		t.Fatal(err)
+	}
+	err := pgx.BeginFunc(ctx, db.Pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SET LOCAL store.bypass = on"); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, "INSERT INTO todo (id, scope_id, title) VALUES ($1, $2, 'old')", todo, scope)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = pgx.BeginFunc(ctx, db.Pool, func(tx pgx.Tx) error {
+		if err := writepath.BeginServer(ctx, tx, scope); err != nil {
+			return err
+		}
+		n, err := writepath.CaptureExisting(ctx, tx, "todo", "scope_id", []string{scope.String()})
+		if err != nil || n != 1 {
+			t.Fatalf("captured %d: %v", n, err)
+		}
+		if n, err := writepath.CaptureExisting(ctx, tx, "todo_item", "", nil); err != nil || n != 0 {
+			t.Fatalf("captured %d items: %v", n, err)
+		}
+		_, err = writepath.End(ctx, tx)
+		return err
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := countRows(t, db, "SELECT count(*) FROM store_log WHERE scope_id = $1 AND row_id = $2 AND op = 'upsert'", scope, todo.String()); n != 1 {
+		t.Fatalf("%d patches for the old todo", n)
+	}
+	epoch, ok, err := writepath.BumpEpoch(ctx, db.Pool, scope)
+	if err != nil || !ok || epoch != 2 {
+		t.Fatalf("epoch %d %v %v", epoch, ok, err)
+	}
+}

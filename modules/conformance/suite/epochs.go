@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/skkil/store/modules/conformance/writepath"
 )
 
 // EpochBumper bumps a scope's epoch, as a restore, failover or shard move
@@ -18,22 +20,23 @@ type EpochBumper interface {
 // ErrNoScope means the scope has no store_scope row yet.
 var ErrNoScope = errors.New("scope has no log yet")
 
-// PostgresEpochs bumps epochs directly in the product's database.
+// PostgresEpochs bumps epochs with store_bump_epoch in the product's database.
 type PostgresEpochs struct {
 	Pool *pgxpool.Pool
 }
 
 // Bump implements EpochBumper.
 func (p PostgresEpochs) Bump(ctx context.Context, scope string) (uint32, error) {
-	var epoch int32
-	err := p.Pool.QueryRow(ctx,
-		"UPDATE store_scope SET epoch = epoch + 1, updated_at = clock_timestamp() WHERE scope_id = $1 RETURNING epoch",
-		scope).Scan(&epoch)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return 0, ErrNoScope
-	}
+	id, err := uuid.Parse(scope)
 	if err != nil {
 		return 0, fmt.Errorf("bump epoch: %w", err)
 	}
-	return uint32(epoch), nil
+	epoch, ok, err := writepath.BumpEpoch(ctx, p.Pool, id)
+	if err != nil {
+		return 0, err
+	}
+	if !ok {
+		return 0, ErrNoScope
+	}
+	return epoch, nil
 }

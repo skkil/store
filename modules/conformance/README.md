@@ -64,7 +64,7 @@ FAIL duplicates   seed=1 steps=3 30ms
 | `-clients` | `3` | Simulated clients per scenario, all in one scope |
 | `-steps` | `60` | Steps per scenario, roughly |
 | `-page-size` | `50` | `limit` of a client's full pull |
-| `-database-url` | | Product Postgres; enables epoch bumps (`UPDATE store_scope SET epoch = epoch + 1`) |
+| `-database-url` | | Product Postgres (store schema 4 or later); enables epoch bumps (`store_bump_epoch`) |
 | `-poke-timeout` | `10s` | How long a listening client may wait to be poked up to the head |
 | `-shrink` | `true` | Re-run a failing scenario with fewer steps to print a minimal trace |
 | `-shrink-runs` | `40` | Most re-runs while shrinking |
@@ -248,7 +248,7 @@ other error aborts the transaction, so the client retries the batch.
 `ApplyServer` records a write the product makes on its own. `DeriveID` matches
 `derive_id` in `store-core`. The single statements (`Begin`, `End`,
 `EndIfChanged`, `Abandon`, `IsOpen`, `RecordRejection`, `ClaimClient`,
-`DropScope`, …) are exported for products that manage transactions
+`DropScope`, `CaptureExisting`, `BumpEpoch`, …) are exported for products that manage transactions
 themselves. The reference token endpoint claims the client first and answers
 409 for a client id another user owns.
 
